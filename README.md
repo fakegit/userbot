@@ -26,6 +26,13 @@ You're gonna need to get the following programs and services either installed on
 or signed up for. You must do all. It is a cardinal sin if you don't.
 * Python 3.10 (requirements were generated for 3.10. Python 3.8 is supported from the looks of it.)
 * `virtualenv` installed so that the packages don't interfere with other system packages.
+* [Deno](https://docs.deno.com/runtime/getting_started/installation/) 2.3+ on `PATH`
+  for YouTube downloads, plus FFmpeg for merging video and audio. Both are included
+  in the Docker images. The `yt-dlp[default]` requirement supplies the matching
+  [YouTube challenge scripts](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
+  HTTP 429 means the service is rate-limiting requests; wait before retrying and
+  check the server/proxy's public IP if it persists. Installing Deno does not
+  remove a rate limit.
 
 * [MongoDB](https://www.mongodb.com) on your server or a free server from 
 [MongoDB Atlas](https://www.mongodb.com/cloud/atlas). (I recommend Atlas as I used it during
@@ -54,18 +61,52 @@ python -m userbot
 *Using docker*
 - Save the following content as `docker-compose.yml`
 ```yml
-version: '3.5'
 services:
   userbot:
     hostname: userbot
     volumes:
       - ./config:/root/userbot/config
-    image: userbot
+    image: ghcr.io/athphane/userbot:latest
+    restart: always
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    depends_on:
+      - userbot-mongo
+  userbot-mongo:
+    image: mongo:latest
+    hostname: userbot-mongo
+    restart: always
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    volumes:
+      - ./mongo:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=userbot
+      - MONGO_INITDB_ROOT_USERNAME=userbot
+      - MONGO_INITDB_ROOT_PASSWORD=userbot-password
+```
+If you already run Watchtower on this Docker host, these labels opt the userbot
+into automatic updates from `ghcr.io/athphane/userbot:latest` and exclude MongoDB.
+Watchtower must be configured to include this container and allow updates; the
+userbot is also opted in when Watchtower uses `--label-enable`. See the
+[Watchtower container selection documentation](https://containrrr.dev/watchtower/container-selection/)
+for name and scope filters. After adding the labels to an existing deployment,
+run `docker compose up -d userbot userbot-mongo` to apply them.
 
+This example uses the published image. The repository's root `docker-compose.yml`
+builds locally and mounts the source checkout, so its labels alone do not enable
+updates from the published image.
+
+- Config \
+ Get your telegram api_id and api_hash from [https://my.telegram.org/apps](https://my.telegram.org/apps) and configure them:
+```
+mkdir config
+wget -O config/userbot.ini https://raw.githubusercontent.com/athphane/userbot/refs/heads/master/userbot.ini.sample
+nano config/userbot.ini
 ```
 - First run:
 ```bash
-docker compose run userbot setup
+docker compose run --rm userbot python -m userbot
 ```
 - Configure userbot and stop container **CTRL+C**
 - Run the container again de-attached:
@@ -74,7 +115,7 @@ docker compose up -d
 ```
 ## Spotify integration
 To get the Spotify commands working on the Userbot, you need to get a CLIENT_ID and CLIENT_SECRET
-form the [Spotify Developer Portal]('https://developer.spotify.com/dashboard/applications) and add
+form the [Spotify Developer Portal](https://developer.spotify.com/dashboard/applications) and add
 them into your userbot.ini file.
 
 On the Spotify developer portal, make sure to set your application `Redirect URI` to 
@@ -91,6 +132,17 @@ project root of the server that will be running your userbot. This is a one time
 ## Known issues
 * `.restart` command do not work on Termux as [psutils is not supported on Android](https://github.com/giampaolo/psutil/issues/913). \
 CTRL+C, run `git pull` and `python -m userbot` to update bot on termux.
+
+## Star History
+
+<a href="https://star-history.com/#athphane/userbot&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=athphane/userbot&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=athphane/userbot&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=athphane/userbot&type=Date" />
+  </picture>
+</a>
+
 
 ## Credits, and Thanks to
 *  [Dan](https://t.me/haskell) for his [Pyrogram Library](https://github.com/pyrogram/pyrogram)
